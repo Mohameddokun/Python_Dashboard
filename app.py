@@ -199,124 +199,294 @@ if selected_section == "🏠 Overview":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------------
-# ECONOMY ANALYSIS SECTION
+# 💼 ECONOMY ANALYSIS SECTION
 # -------------------------------
 elif selected_section == "💼 Economy Analysis":
     st.markdown('<h2 class="section-header">💼 Economy Type Analysis</h2>', unsafe_allow_html=True)
-    
-    # Set dark theme for matplotlib
-    plt.style.use('dark_background')
-    fig1, ax1 = plt.subplots(figsize=(14, 8))
-    
-    economy_summary = data['economy'].groupby('Economy_Type')['Total'].sum().sort_values(ascending=True)
-    
-    colors = ['#D4AF37', '#FFD700', '#C9A227', '#B8860B']
-    
-    bars = ax1.barh(range(len(economy_summary)), economy_summary.values,
-                    color=colors * (len(economy_summary) // len(colors) + 1),
-                    edgecolor='white', linewidth=0.5)
-    
-    ax1.set_title("Economy Type Distribution", fontsize=16, fontweight='bold', pad=20, color='white')
-    ax1.set_xlabel("Total Count", fontsize=12, fontweight='bold', color='white')
-    ax1.set_ylabel("Economy Type", fontsize=12, fontweight='bold', color='white')
-    
-    labels = [f"{label[:20]}..." if len(label) > 20 else label for label in economy_summary.index]
-    ax1.set_yticks(range(len(economy_summary)))
-    ax1.set_yticklabels(labels, color='white')
-    
-    for i, (bar, value) in enumerate(zip(bars, economy_summary.values)):
-        ax1.text(bar.get_width() + bar.get_width() * 0.01, 
-                 bar.get_y() + bar.get_height()/2, 
-                 f'{value:,}', va='center', ha='left', fontsize=10, color='white', fontweight='bold')
-    
-    ax1.grid(axis='x', alpha=0.3, linestyle='--', color='white')
-    plt.tight_layout()
-    st.pyplot(fig1)
-    
-    # Gender Analysis
-    if 'Gender_Type' in data['economy'].columns:
-        st.markdown("""
-        <div class="luxury-card" style="margin-top: 2rem;">
-            <h3 style="color: #FFD700; text-align:center; margin-bottom: 0.5rem;">👥 Gender Distribution Analysis</h3>
-            <p style="color:#a0aec0; text-align:center;">Visualizing gender participation across economy sectors with clarity & luxury design.</p>
-        </div>
-        """, unsafe_allow_html=True)
 
-        # Prepare the data
-        df_econ = data['economy'].copy()
-        df_econ['Economy_Short'] = df_econ['Economy_Type'].apply(
-            lambda x: x if len(x) <= 20 else x[:18] + "..."
+    # --- Intro Card ---
+    st.markdown("""
+    <div class="luxury-card" style="padding: 1rem 1.5rem;">
+        <h3 style="color: #D4AF37; margin-bottom: 0.5rem;">📈 Economic Activity Overview</h3>
+        <p style="color: #a0aec0; margin-top: 0;">Explore Egypt’s economic landscape, segmented by activity type and gender, to understand participation and distribution.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- Color Palette ---
+    luxury_colors = ['#D4AF37', '#8B5CF6', '#10B981', '#EF4444', '#3B82F6', '#F97316', '#EC4899']
+    gender_colors = ['#D4AF37', '#8B5CF6'] # Gold & Purple
+    male_color = '#3B82F6'
+    female_color = '#EC4899'
+    
+    plt.style.use('dark_background')
+    
+    # --- Data Pre-computation ---
+    if 'economy' in data and not data['economy'].empty:
+        econ_data = data['economy'].copy()
+        
+        # Ensure 'Total' is numeric
+        econ_data['Total'] = pd.to_numeric(econ_data['Total'], errors='coerce')
+        econ_data = econ_data.dropna(subset=['Total'])
+        
+        # Create short labels for charts
+        econ_data['Economy_Short'] = econ_data['Economy_Type'].apply(
+            lambda x: x if len(x) <= 25 else x[:23] + "..."
         )
 
+        # Aggregations
+        econ_counts = econ_data.groupby("Economy_Short")["Total"].sum().sort_values(ascending=False)
+        gender_counts = econ_data.groupby("Gender_Type")["Total"].sum()
+        
+        # --- Row 1: Overall Status & Gender Breakdown ---
         col1, col2 = st.columns(2)
 
-        # ======================================
-        # Chart 1 — Smoothed Point Plot by Gender
-        # ======================================
+        # --- Chart 1: Donut Chart (Economy Type) ---
         with col1:
-            st.markdown("""
-            <div class="luxury-card" style="padding:1rem; border-left: 3px solid #D4AF37;">
-                <h4 style="color:#FFD700;">💼 Economy Type by Gender</h4>
-            """, unsafe_allow_html=True)
+            # Use top 7 for pie chart, group others
+            if len(econ_counts) > 7:
+                pie_data = econ_counts.nlargest(6)
+                pie_data['Others'] = econ_counts.nsmallest(len(econ_counts) - 6).sum()
+            else:
+                pie_data = econ_counts
+                
+            fig1, ax1 = plt.subplots(figsize=(8, 8))
+            wedges, texts, autotexts = ax1.pie(
+                pie_data.values,
+                autopct='%1.1f%%',
+                startangle=90,
+                colors=luxury_colors,
+                wedgeprops={'edgecolor': 'white', 'linewidth': 1.2, 'width': 0.4}
+            )
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+            ax1.set_title("Economy Type Distribution (Top 6 + Others)", fontsize=16, fontweight='bold', color='#FFD700')
+            ax1.legend(wedges, pie_data.index,
+                       title="Economy Type",
+                       title_fontsize=12,
+                       fontsize=10,
+                       loc="center left",
+                       bbox_to_anchor=(0.95, 0.5))
+            st.pyplot(fig1)
 
+        # --- Chart 2: Donut Chart (Gender Distribution) ---
+        with col2:
             plt.style.use('dark_background')
-            fig2, ax2 = plt.subplots(figsize=(10, 5))
+            fig2, ax2 = plt.subplots(figsize=(8, 8))
 
-            sns.pointplot(
-                data=df_econ,
-                x="Economy_Short", y="Total", hue="Gender_Type",
-                palette=['#D4AF37', '#8B5CF6'],
-                errorbar=None, markers=['o', 's'], linestyles=['-', '--'], ax=ax2
+            # Donut chart with smoother edges and balanced layout
+            wedges, texts, autotexts = ax2.pie(
+                gender_counts.values,
+                labels=None,  # hide raw labels, we’ll handle them manually
+                autopct='%1.1f%%',
+                startangle=90,
+                colors=gender_colors,
+                wedgeprops={'edgecolor': 'white', 'linewidth': 1.2, 'width': 0.35},
+                textprops={'color': 'white', 'fontweight': 'bold', 'fontsize': 12}
             )
 
-            ax2.set_title("Economy Type by Gender", fontsize=13, fontweight='bold', color='#FFD700')
-            ax2.set_xlabel("", color='white')
-            ax2.set_ylabel("Total Count", fontweight='bold', color='white')
-            ax2.tick_params(axis='x', rotation=35, labelsize=9, colors='white')
-            ax2.tick_params(axis='y', labelsize=9, colors='white')
-            ax2.legend(title="Gender", title_fontsize=11, fontsize=9, loc='upper right', frameon=False)
-            ax2.grid(alpha=0.2, linestyle='--', color='#555')
+            # Improve percentage text style
+            for autotext in autotexts:
+                autotext.set_color("#FFFFFF")  # black text on colored wedges
+                autotext.set_fontweight('bold')
+                autotext.set_fontsize(12)
+
+            # Add category labels (around the donut, clearer than overlapping)
+            for i, (label, wedge) in enumerate(zip(gender_counts.index, wedges)):
+                angle = (wedge.theta2 - wedge.theta1)/2. + wedge.theta1
+                x = np.cos(np.deg2rad(angle))
+                y = np.sin(np.deg2rad(angle))
+                ax2.text(
+                    1.25 * x, 1.25 * y, label,
+                    ha='center', va='center',
+                    fontsize=13, fontweight='bold',
+                    color='#FFD700'
+                )
+
+            # Add a nice center label showing total
+            total = gender_counts.sum()
+            ax2.text(
+                0, 0, f"Total\n{total:,}",
+                ha='center', va='center',
+                fontsize=15, fontweight='bold',
+                color='#D4AF37'
+            )
+
+            # Title
+            ax2.set_title(
+                "Overall Gender Distribution in Economy",
+                fontsize=16, fontweight='bold',
+                color='#FFD700', pad=25
+            )
+
+            # Add legend for clarity
+            ax2.legend(
+                gender_counts.index,
+                title="Gender",
+                title_fontsize=12,
+                fontsize=10,
+                loc="center left",
+                bbox_to_anchor=(1, 0, 0.5, 1)
+            )
 
             plt.tight_layout()
             st.pyplot(fig2)
-            st.markdown("</div>", unsafe_allow_html=True)
 
-        # ======================================
-        # Chart 2 — Bar Plot (Average by Gender)
-        # ======================================
-        with col2:
-            st.markdown("""
-            <div class="luxury-card" style="padding:1rem; border-left: 3px solid #8B5CF6;">
-                <h4 style="color:#FFD700;">📊 Average Distribution by Gender</h4>
+
+        # --- Row 2: Status by Gender ---
+        st.markdown("---")
+        
+        # --- Chart 3: Bar Chart by Gender ---
+        if 'Gender_Type' in econ_data.columns:
+            fig3, ax3 = plt.subplots(figsize=(12, 7))
+            
+            # Use the sorted order from econ_counts
+            status_order = econ_counts.index
+            
+            sns.barplot(
+                data=econ_data,
+                x="Economy_Short", y="Total", hue="Gender_Type",
+                palette=gender_colors,
+                edgecolor='white', linewidth=0.6, ax=ax3,
+                order=status_order
+            )
+            ax3.set_title("Total Count by Economy Type & Gender", fontsize=18, fontweight='bold', color='#FFD700')
+            ax3.set_xlabel("Economy Type", fontweight='bold', color='white', fontsize=12)
+            ax3.set_ylabel("Total Count", fontweight='bold', color='white', fontsize=12)
+            ax3.tick_params(axis='x', rotation=45, labelcolor='white', labelsize=10)
+            ax3.tick_params(axis='y', labelcolor='white')
+            ax3.legend(title="Gender", title_fontsize=12, fontsize=10)
+            st.pyplot(fig3, use_container_width=True)
+
+        # --- Row 3: Top Statuses by Gender ---
+        st.markdown("---")
+        col3, col4 = st.columns(2)
+        
+        # --- Chart 4: Top 5 Economy Types for Males ---
+        with col3:
+            male_data = econ_data[econ_data['Gender_Type'] == 'Male']
+            male_status = male_data.groupby('Economy_Short')['Total'].sum().nlargest(5).sort_values()
+            
+            fig4, ax4 = plt.subplots(figsize=(10, 6))
+            sns.barplot(
+                x=male_status.values, y=male_status.index,
+                palette=[male_color] * len(male_status),
+                ax=ax4, edgecolor='white', linewidth=0.7
+            )
+            ax4.set_title("Top 5 Economy Types (Male)", fontsize=16, fontweight='bold', color='#FFD700')
+            ax4.set_xlabel("Total Count", fontweight='bold', color='white')
+            ax4.set_ylabel("Economy Type", fontweight='bold', color='white')
+            ax4.tick_params(colors='white')
+            # Add value labels
+            for i, v in enumerate(male_status.values):
+                ax4.text(v + (male_status.values.max() * 0.01), i, f'{v:,.0f}', color='white', va='center')
+            st.pyplot(fig4)
+
+        # --- Chart 5: Top 5 Economy Types for Females ---
+        with col4:
+            female_data = econ_data[econ_data['Gender_Type'] == 'Female']
+            female_status = female_data.groupby('Economy_Short')['Total'].sum().nlargest(5).sort_values()
+            
+            fig5, ax5 = plt.subplots(figsize=(10, 6))
+            sns.barplot(
+                x=female_status.values, y=female_status.index,
+                palette=[female_color] * len(female_status),
+                ax=ax5, edgecolor='white', linewidth=0.7
+            )
+            ax5.set_title("Top 5 Economy Types (Female)", fontsize=16, fontweight='bold', color='#FFD700')
+            ax5.set_xlabel("Total Count", fontweight='bold', color='white')
+            ax5.set_ylabel("Economy Type", fontweight='bold', color='white')
+            ax5.tick_params(colors='white')
+            # Add value labels
+            for i, v in enumerate(female_status.values):
+                ax5.text(v + (female_status.values.max() * 0.01), i, f'{v:,.0f}', color='white', va='center')
+            st.pyplot(fig5)
+
+        # --- Row 4: Gender Proportions ---
+        st.markdown("---")
+
+        # --- Chart 6: 100% Stacked Bar - Gender Percentage by Economy Type ---
+        if 'Gender_Type' in econ_data.columns:
+            # Pivot data
+            pivot_df = econ_data.pivot_table(index='Economy_Short', columns='Gender_Type', values='Total', aggfunc='sum').fillna(0)
+            
+            # Add total sum and sort
+            pivot_df['Total_Sum'] = pivot_df.sum(axis=1)
+            pivot_df = pivot_df.sort_values('Total_Sum', ascending=False)
+            
+            # Calculate percentage
+            pivot_df_percent = pivot_df[['Male', 'Female']].divide(pivot_df['Total_Sum'], axis=0)
+            
+            fig6, ax6 = plt.subplots(figsize=(12, 7))
+            pivot_df_percent.plot(
+                kind='bar',
+                stacked=True,
+                ax=ax6,
+                color=gender_colors,
+                edgecolor='white',
+                linewidth=0.5
+            )
+            ax6.set_title("Gender Percentage by Economy Type", fontsize=18, fontweight='bold', color='#FFD700')
+            ax6.set_xlabel("Economy Type", fontweight='bold', color='white', fontsize=12)
+            ax6.set_ylabel("Percentage", fontweight='bold', color='white', fontsize=12)
+            ax6.legend(title="Gender", title_fontsize=11, fontsize=9, loc='center left', bbox_to_anchor=(1, 0.5))
+            ax6.tick_params(axis='x', rotation=45, labelcolor='white')
+            ax6.tick_params(axis='y', labelcolor='white')
+            ax6.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: '{:.0%}'.format(y)))
+            
+            st.pyplot(fig6, use_container_width=True)
+
+        # --- Insights Cards ---
+        total_count = econ_data["Total"].sum()
+        top_econ_type = econ_counts.idxmax()
+        top_gender = gender_counts.idxmax()
+        num_econ_types = len(econ_counts)
+
+        st.markdown("""
+        <div class="luxury-card" style="margin-top: 1.5rem; text-align:center;">
+            <h3 style="color: #D4AF37;">📊 Key Insights</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+        colA, colB, colC, colD = st.columns(4)
+        with colA:
+            st.markdown(f"""
+            <div class="insight-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #D4AF37; height: 100%;">
+                <h4 style="color:#FFD700;">Top Economy Type</h4>
+                <p style="color:white; font-size:1.1rem;"><b>{top_econ_type}</b></p>
+            </div>
+            """, unsafe_allow_html=True)
+        with colB:
+            st.markdown(f"""
+            <div class="insight-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #8B5CF6; height: 100%;">
+                <h4 style="color:#8B5CF6;">Dominant Gender</h4>
+                <p style="color:white; font-size:1.1rem;"><b>{top_gender}</b></p>
+            </div>
+            """, unsafe_allow_html=True)
+        with colC:
+            st.markdown(f"""
+            <div class-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #10B981; height: 100%;">
+                <h4 style="color:#10B981;">Economy Types</h4>
+                <p style="color:white; font-size:1.1rem;"><b>{num_econ_types}</b> Categories</p>
+            </div>
+            """, unsafe_allow_html=True)
+        with colD:
+            st.markdown(f"""
+            <div class="insight-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #EF4444; height: 100%;">
+                <h4 style="color:#EF4444;">Total Recorded</h4>
+                <p style="color:white; font-size:1.1rem;"><b>{total_count:,.0f}</b></p>
+            </div>
             """, unsafe_allow_html=True)
 
-            plt.style.use('dark_background')
-            fig3, ax3 = plt.subplots(figsize=(10, 5))
+        # --- Footer ---
+        st.markdown("""
+        <div style="margin-top: 2rem; text-align:center; color:#a0aec0;">
+            <em>This economic analysis provides a detailed breakdown of activity by type and gender.</em>
+        </div>
+        """, unsafe_allow_html=True)
 
-            pivot_data = (
-                df_econ
-                .pivot_table(index="Economy_Short", columns="Gender_Type", values="Total", aggfunc='mean')
-                .fillna(0)
-            )
-
-            pivot_data.plot(
-                kind='bar', ax=ax3,
-                color=['#D4AF37', '#8B5CF6'],
-                edgecolor='white', linewidth=0.6
-            )
-
-            ax3.set_title("Average Distribution by Gender", fontsize=13, fontweight='bold', color='#FFD700')
-            ax3.set_xlabel("", color='white')
-            ax3.set_ylabel("Average Count", fontweight='bold', color='white')
-            ax3.tick_params(axis='x', rotation=35, labelsize=9, colors='white')
-            ax3.tick_params(axis='y', labelsize=9, colors='white')
-            ax3.legend(title="Gender", title_fontsize=11, fontsize=9, loc='upper right', frameon=False)
-            ax3.grid(axis='y', alpha=0.2, linestyle='--', color='#555')
-
-            plt.tight_layout()
-            st.pyplot(fig3)
-            st.markdown("</div>", unsafe_allow_html=True)
-    
+    else:
+        st.error("Economy data could not be loaded. Please check the data source.")
     
 
 # -------------------------------
@@ -407,108 +577,264 @@ elif selected_section == "👥 Employment & Age":
 elif selected_section == "🎓 Education Analysis":
     st.markdown('<h2 class="section-header">🎓 Educational Status Analysis</h2>', unsafe_allow_html=True)
 
-    # --- Intro & Description ---
+    # --- Intro Card ---
     st.markdown("""
     <div class="luxury-card" style="padding: 1rem 1.5rem;">
-        <h3 style="color: #D4AF37; margin-bottom: 0.5rem;">📚 Educational Status Distribution</h3>
-        <p style="color: #a0aec0; margin-top: 0;">Explore Egypt’s education levels by status, gender, and region to reveal development trends.</p>
+        <h3 style="color: #D4AF37; margin-bottom: 0.5rem;">📚 Comprehensive Educational Analysis</h3>
+        <p style="color: #a0aec0; margin-top: 0;">Deep dive into Egypt's education landscape with multi-dimensional insights across status, gender, regions, and time.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- Layout Columns ---
-    col1, col2 = st.columns([1.1, 1])
+    # --- Color Palette ---
+    luxury_colors = ['#D4AF37', '#8B5CF6', '#10B981', '#EF4444', '#3B82F6', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16']
+    plt.style.use('dark_background')
 
-    # --- Pie Chart: Educational Status Distribution ---
+    # --- Data Preparation ---
+    # Create education level mapping
+    education_mapping = {
+        'Illiterate': 'Basic Literacy',
+        'Literate (can read and write without formal qualification)': 'Basic Literacy', 
+        'Literacy certificate (post-illiteracy program)': 'Basic Literacy',
+        'Primary school': 'Primary',
+        'Preparatory school (Middle school)': 'Preparatory',
+        'General Secondary / Azhar Secondary': 'Secondary',
+        'Intermediate Technical Qualification': 'Technical',
+        'Above Intermediate Qualification (Diploma)': 'Diploma',
+        'University Degree (Bachelor\'s)': 'University',
+        'Higher Diploma': 'Postgraduate',
+        'Master\'s Degree': 'Postgraduate',
+        'Doctorate (PhD)': 'Postgraduate',
+        'Intellectual Education (special education)': 'Special Education'
+    }
+    
+    # Apply mapping and ensure all categories exist
+    data['education']['Education_Level'] = data['education']['Status'].map(education_mapping)
+    
+    # Define all possible education levels
+    all_education_levels = [
+        'Basic Literacy', 'Primary', 'Preparatory', 'Secondary', 
+        'Technical', 'Diploma', 'University', 'Postgraduate', 'Special Education'
+    ]
+
+    # --- Chart 1: Enhanced Pie Chart with Education Levels ---
+    col1, col2 = st.columns([1, 1])
     with col1:
-        edu_counts = data['education'].groupby("Status")["Total"].sum().sort_values(ascending=False)
-        luxury_colors = ['#D4AF37', '#8B5CF6', '#10B981', '#EF4444', '#3B82F6']
-
+        level_counts = data['education'].groupby("Education_Level")["Total"].sum().reindex(all_education_levels, fill_value=0)
+        level_counts = level_counts[level_counts > 0]  # Remove zero counts
+        
         fig1, ax1 = plt.subplots(figsize=(8, 8))
-        plt.style.use('dark_background')
-
         wedges, texts, autotexts = ax1.pie(
-            edu_counts.values,
-            labels=None,
+            level_counts.values,
             autopct='%1.1f%%',
             startangle=90,
-            colors=luxury_colors,
+            colors=luxury_colors[:len(level_counts)],
             wedgeprops={'edgecolor': 'white', 'linewidth': 1.2}
         )
-
-        # Text style improvements
         for autotext in autotexts:
             autotext.set_color('white')
             autotext.set_fontweight('bold')
-        for text in texts:
-            text.set_color('#E0E0E0')
-
-        ax1.set_title("Educational Status Breakdown", fontsize=16, fontweight='bold', color='#FFD700')
-        ax1.legend(
-            edu_counts.index,
-            title="Status",
-            title_fontsize=12,
-            fontsize=10,
-            loc="center left",
-            bbox_to_anchor=(1, 0, 0.5, 1)
-        )
-
-        plt.tight_layout()
+        ax1.set_title("Education Level Distribution", fontsize=16, fontweight='bold', color='#FFD700')
+        ax1.legend(level_counts.index, title="Education Level", title_fontsize=10, fontsize=9, 
+                  loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
         st.pyplot(fig1)
 
-    # --- Bar Chart: Status by Gender ---
+    # --- Chart 2: Gender Distribution by Education Level ---
     with col2:
-        if 'Gender_Type' in data['education'].columns:
-            plt.style.use('dark_background')
-            fig2, ax2 = plt.subplots(figsize=(9, 7))
+        gender_level = data['education'].pivot_table(
+            index='Education_Level', columns='Gender_Type', values='Total', aggfunc='sum'
+        ).reindex(all_education_levels, fill_value=0)
+        
+        # Remove rows with zero totals
+        gender_level = gender_level[(gender_level.sum(axis=1) > 0)]
+        
+        fig2, ax2 = plt.subplots(figsize=(10, 8))
+        gender_level.plot(kind='bar', ax=ax2, color=['#D4AF37', '#8B5CF6'], edgecolor='white', linewidth=0.6)
+        ax2.set_title("Education Level Distribution by Gender", fontsize=16, fontweight='bold', color='#FFD700')
+        ax2.set_xlabel("Education Level", fontweight='bold', color='white')
+        ax2.set_ylabel("Total Count", fontweight='bold', color='white')
+        ax2.tick_params(axis='x', rotation=45, labelcolor='white')
+        ax2.tick_params(axis='y', labelcolor='white')
+        ax2.legend(title="Gender", title_fontsize=12, fontsize=10)
+        ax2.grid(axis='y', alpha=0.3, color='gray')
+        st.pyplot(fig2)
 
-            sns.barplot(
-                data=data['education'],
-                x="Status", y="Total", hue="Gender_Type",
-                palette=['#D4AF37', '#8B5CF6'],
-                edgecolor='white', linewidth=0.6, ax=ax2
-            )
+    # --- Chart 3: Literacy Rate by Governorate ---
+    st.markdown("### 📊 Regional Analysis")
+    col3, col4 = st.columns([1, 1])
+    
+    with col3:
+        # Create pivot table with all education levels
+        gov_data = data['education'].pivot_table(
+            index='Governorate', columns='Education_Level', values='Total', aggfunc='sum'
+        ).reindex(columns=all_education_levels, fill_value=0)
+        
+        gov_data['Total_Population'] = gov_data.sum(axis=1)
+        gov_data['Literacy_Rate'] = (1 - (gov_data['Basic Literacy'] / gov_data['Total_Population'])) * 100
+        
+        top_literacy = gov_data.nlargest(10, 'Literacy_Rate')['Literacy_Rate']
+        
+        fig3, ax3 = plt.subplots(figsize=(10, 6))
+        sns.barplot(x=top_literacy.values, y=top_literacy.index, palette=['#10B981'] * len(top_literacy),
+                   ax=ax3, edgecolor='white', linewidth=0.7)
+        ax3.set_title("Top 10 Governorates by Literacy Rate (%)", fontsize=14, fontweight='bold', color='#FFD700')
+        ax3.set_xlabel("Literacy Rate (%)", fontweight='bold', color='white')
+        ax3.set_ylabel("Governorate", fontweight='bold', color='white')
+        ax3.tick_params(colors='white')
+        st.pyplot(fig3)
 
-            ax2.set_title("Educational Status by Gender", fontsize=16, fontweight='bold', color='#FFD700')
-            ax2.set_xlabel("Educational Status", fontweight='bold', color='white')
-            ax2.set_ylabel("Total Count", fontweight='bold', color='white')
-            ax2.tick_params(axis='x', rotation=40, labelcolor='white')
-            ax2.tick_params(axis='y', labelcolor='white')
-            ax2.legend(title="Gender", title_fontsize=12, fontsize=10)
+    # --- Chart 4: Higher Education Concentration ---
+    with col4:
+        # Safely calculate higher education (handle missing columns)
+        higher_edu_columns = [col for col in ['University', 'Postgraduate'] if col in gov_data.columns]
+        if higher_edu_columns:
+            higher_edu = gov_data[higher_edu_columns].sum(axis=1)
+        else:
+            higher_edu = gov_data['Total_Population'] * 0  # Fallback if no higher education data
+            
+        top_higher_edu = higher_edu.nlargest(10)
+        
+        fig4, ax4 = plt.subplots(figsize=(10, 6))
+        sns.barplot(x=top_higher_edu.values, y=top_higher_edu.index, palette=['#8B5CF6'] * len(top_higher_edu),
+                   ax=ax4, edgecolor='white', linewidth=0.7)
+        ax4.set_title("Top 10 Governorates - Higher Education Population", fontsize=14, fontweight='bold', color='#FFD700')
+        ax4.set_xlabel("University & Postgraduate Students", fontweight='bold', color='white')
+        ax4.set_ylabel("Governorate", fontweight='bold', color='white')
+        ax4.tick_params(colors='white')
+        st.pyplot(fig4)
 
-            plt.tight_layout()
-            st.pyplot(fig2)
+    # --- Chart 5: Gender Gap in Education ---
+    st.markdown("### ⚖️ Gender Parity Analysis")
+    col5, col6 = st.columns([1, 1])
+    
+    with col5:
+        gender_gap = data['education'].pivot_table(
+            index='Education_Level', columns='Gender_Type', values='Total', aggfunc='sum'
+        ).reindex(all_education_levels, fill_value=0)
+        
+        # Calculate ratio only where both genders have data
+        gender_gap['Gender_Ratio'] = 0
+        mask = (gender_gap['Male'] > 0) & (gender_gap['Female'] > 0)
+        gender_gap.loc[mask, 'Gender_Ratio'] = (gender_gap.loc[mask, 'Female'] / gender_gap.loc[mask, 'Male']) * 100
+        
+        gender_gap = gender_gap[gender_gap.sum(axis=1) > 0]  # Remove empty rows
+        
+        fig5, ax5 = plt.subplots(figsize=(10, 6))
+        bars = ax5.barh(gender_gap.index, gender_gap['Gender_Ratio'], color='#EC4899', edgecolor='white', linewidth=0.7)
+        ax5.axvline(x=100, color='#FFD700', linestyle='--', alpha=0.7, label='Gender Parity (100%)')
+        ax5.set_title("Female-to-Male Ratio by Education Level (%)", fontsize=14, fontweight='bold', color='#FFD700')
+        ax5.set_xlabel("Female/Male Ratio (%)", fontweight='bold', color='white')
+        ax5.set_ylabel("Education Level", fontweight='bold', color='white')
+        ax5.tick_params(colors='white')
+        ax5.legend()
+        st.pyplot(fig5)
 
-    # --- Insights Cards ---
+    # --- Chart 6: Technical vs Academic Education ---
+    with col6:
+        # Safely get technical and academic columns
+        tech_academic_cols = [col for col in ['Technical', 'University', 'Secondary'] if col in gov_data.columns]
+        if tech_academic_cols:
+            tech_vs_academic = gov_data[tech_academic_cols].sum(axis=1)
+        else:
+            tech_vs_academic = gov_data['Total_Population'] * 0
+            
+        top_tech_academic = tech_vs_academic.nlargest(10)
+        
+        fig6, ax6 = plt.subplots(figsize=(10, 6))
+        top_tech_academic.plot(kind='bar', ax=ax6, color='#F59E0B', edgecolor='white', linewidth=0.7)
+        ax6.set_title("Technical & Academic Education by Governorate", fontsize=14, fontweight='bold', color='#FFD700')
+        ax6.set_xlabel("Governorate", fontweight='bold', color='white')
+        ax6.set_ylabel("Total Students", fontweight='bold', color='white')
+        ax6.tick_params(axis='x', rotation=45, labelcolor='white')
+        ax6.tick_params(axis='y', labelcolor='white')
+        st.pyplot(fig6)
+
+    # --- Chart 7: Education Pyramid ---
+    st.markdown("### 📐 Education Structure")
+    col7, col8 = st.columns([1.7, 0.3])  # col7 = 85% width, col8 = 15%
+
+    
+    with col7:
+        # Create education pyramid with existing levels only
+        pyramid_data = level_counts.sort_values(ascending=False)
+        
+        fig7, ax7 = plt.subplots(figsize=(18, 14))
+        y_pos = range(len(pyramid_data))
+        ax7.barh(y_pos, pyramid_data.values, color=luxury_colors[:len(pyramid_data)], edgecolor='white', linewidth=0.7)
+        ax7.set_yticks(y_pos)
+        ax7.set_yticklabels(pyramid_data.index)
+        ax7.set_title("Education Pyramid - Population by Level", fontsize=14, fontweight='bold', color='#FFD700')
+        ax7.set_xlabel("Total Population", fontweight='bold', color='white')
+        ax7.set_ylabel("Education Level", fontweight='bold', color='white')
+        ax7.tick_params(colors='white')
+        ax7.grid(axis='x', alpha=0.3, color='gray')
+        st.pyplot(fig7)
+
+    # --- Chart 9: Education Status Original Breakdown ---
+    st.markdown("### 📋 Detailed Status View")
+    
+    # Original education status breakdown
+    edu_status_counts = data['education'].groupby("Status")["Total"].sum().nlargest(15)
+    
+    fig9, ax9 = plt.subplots(figsize=(12, 8))
+    sns.barplot(x=edu_status_counts.values, y=edu_status_counts.index, palette=luxury_colors,
+               ax=ax9, edgecolor='white', linewidth=0.7)
+    ax9.set_title("Top 15 Detailed Education Status Categories", fontsize=16, fontweight='bold', color='#FFD700')
+    ax9.set_xlabel("Total Count", fontweight='bold', color='white')
+    ax9.set_ylabel("Education Status", fontweight='bold', color='white')
+    ax9.tick_params(colors='white')
+    st.pyplot(fig9)
+
+    # --- Enhanced Insights Cards ---
     total_students = data['education']["Total"].sum()
-    top_status = edu_counts.idxmax()
-    top_value = edu_counts.max()
-    top_ratio = (top_value / total_students) * 100
+    
+    # Safe literacy rate calculation
+    basic_literacy_total = gov_data['Basic Literacy'].sum() if 'Basic Literacy' in gov_data.columns else 0
+    total_population = gov_data['Total_Population'].sum()
+    literacy_rate = (1 - (basic_literacy_total / total_population)) * 100 if total_population > 0 else 0
+    
+    # Safe highest education region
+    if 'University' in gov_data.columns:
+        highest_edu_region = gov_data['University'].idxmax()
+    else:
+        highest_edu_region = "N/A"
+    
+    # Gender parity calculation
+    female_total = data['education'][data['education']['Gender_Type'] == 'Female']['Total'].sum()
+    male_total = data['education'][data['education']['Gender_Type'] == 'Male']['Total'].sum()
+    gender_parity_index = (female_total / male_total) * 100 if male_total > 0 else 0
 
     st.markdown("""
     <div class="luxury-card" style="margin-top: 1.5rem; text-align:center;">
-        <h3 style="color: #D4AF37;">📊 Key Insights</h3>
+        <h3 style="color: #D4AF37;">📊 Comprehensive Insights</h3>
     </div>
     """, unsafe_allow_html=True)
 
-    col3, col4, col5 = st.columns(3)
-    with col3:
+    col9, col10, col11, col12 = st.columns(4)
+    with col9:
         st.markdown(f"""
         <div class="insight-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #D4AF37;">
-            <h4 style="color:#FFD700;">Top Educational Status</h4>
-            <p style="color:white; font-size:1.1rem;"><b>{top_status}</b></p>
+            <h4 style="color:#FFD700;">National Literacy</h4>
+            <p style="color:white; font-size:1.1rem;"><b>{literacy_rate:.1f}%</b></p>
         </div>
         """, unsafe_allow_html=True)
-    with col4:
+    with col10:
         st.markdown(f"""
         <div class="insight-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #8B5CF6;">
-            <h4 style="color:#8B5CF6;">Highest Share</h4>
-            <p style="color:white; font-size:1.1rem;"><b>{top_ratio:.1f}%</b> of total</p>
+            <h4 style="color:#8B5CF6;">Highest Education Region</h4>
+            <p style="color:white; font-size:1.1rem;"><b>{highest_edu_region}</b></p>
         </div>
         """, unsafe_allow_html=True)
-    with col5:
+    with col11:
         st.markdown(f"""
         <div class="insight-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #10B981;">
-            <h4 style="color:#10B981;">Total Recorded</h4>
+            <h4 style="color:#10B981;">Gender Parity Index</h4>
+            <p style="color:white; font-size:1.1rem;"><b>{gender_parity_index:.1f}%</b></p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col12:
+        st.markdown(f"""
+        <div class="insight-card" style="background: #1a1a1a; padding: 1rem; border-radius: 12px; border: 1px solid #F59E0B;">
+            <h4 style="color:#F59E0B;">Total Analyzed</h4>
             <p style="color:white; font-size:1.1rem;"><b>{total_students:,.0f}</b></p>
         </div>
         """, unsafe_allow_html=True)
@@ -516,11 +842,9 @@ elif selected_section == "🎓 Education Analysis":
     # --- Footer ---
     st.markdown("""
     <div style="margin-top: 2rem; text-align:center; color:#a0aec0;">
-        <em>This educational breakdown highlights Egypt’s learning progress across gender and qualification levels.</em>
+        <em>This comprehensive educational analysis reveals Egypt's learning landscape through literacy rates, gender parity, regional disparities, and educational diversity.</em>
     </div>
     """, unsafe_allow_html=True)
-
-
 # -------------------------------
 # GEOGRAPHICAL ANALYSIS SECTION
 # -------------------------------
